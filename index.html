@@ -65,13 +65,12 @@
         .del-badge { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; }
         .edit-mode .del-badge { display: flex; }
 
-        /* ✕ 버튼: 기본 숨김, 모바일 전용 */
         .sidebar-close-btn { display: none; justify-content: flex-end; padding: 10px; font-size: 24px; cursor: pointer; color: var(--apple-blue); }
 
         @media (max-width: 768px) {
             .sidebar { position: absolute; left: 0; top: 0; height: 100%; transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
-            .sidebar-close-btn { display: flex; } /* 모바일에서만 노출 */
+            .sidebar-close-btn { display: flex; }
             .menu-toggle { display: block; }
         }
     </style>
@@ -80,7 +79,6 @@
 
 <div class="sidebar" id="sidebar">
     <div class="sidebar-close-btn" onclick="toggleSidebar()">✕</div>
-    
     <div class="sidebar-section">
         <div class="sidebar-header" onclick="toggleSection('shortcutSection', this)">단축어 <span class="arrow">▼</span></div>
         <div id="shortcutSection" class="sidebar-content">
@@ -98,23 +96,23 @@
     <div class="sidebar-footer">
         <button onclick="toggleTheme()" style="padding:14px; border-radius:18px; background:var(--apple-blue); color:white; border:none; font-weight:bold; cursor:pointer;">🌓 테마 전환</button>
         <div class="io-container">
-            <div class="io-btn" onclick="exportData()">📤 내보내기</div>
-            <div class="io-btn" onclick="document.getElementById('fileIn').click()">📥 불러오기</div>
+            <div class="io-btn" onclick="adminAction(() => exportData())">📤 내보내기</div>
+            <div class="io-btn" onclick="adminAction(() => document.getElementById('fileIn').click())">📥 불러오기</div>
         </div>
         <input type="file" id="fileIn" style="display:none" onchange="importData(event)">
     </div>
 </div>
 
-<div class="main-content">
+<div class="main-content" onclick="closeSidebarOnOutsideClick()">
     <div class="header">
         <div class="header-top">
             <div style="display:flex; align-items:center; gap:15px;">
-                <div class="menu-toggle" onclick="toggleSidebar()">☰</div>
+                <div class="menu-toggle" onclick="event.stopPropagation(); toggleSidebar();">☰</div>
                 <h1 id="viewTitle" style="margin:0; font-size: 1.8rem;">모든 단축어</h1>
             </div>
             <div style="display:flex; gap:20px; align-items:center;">
-                <span class="edit-label" id="editBtn" onclick="toggleEditMode()" style="color:var(--apple-blue); font-weight:bold; cursor:pointer;">편집</span>
-                <span class="plus-btn" onclick="openModal()">＋</span>
+                <span class="edit-label" id="editBtn" onclick="adminAction(() => toggleEditMode())" style="color:var(--apple-blue); font-weight:bold; cursor:pointer;">편집</span>
+                <span class="plus-btn" onclick="adminAction(() => openModal())">＋</span>
             </div>
         </div>
         <input type="text" id="searchInput" placeholder="🔍 검색" style="background:rgba(0,0,0,0.06); padding:14px;" oninput="render()">
@@ -144,8 +142,25 @@
 
 <script>
     const BIN_ID = '69ce0ae7aaba882197b8e875', API_KEY = '$2a$10$/FXh/Agpz01vjrcmEic7wugXaICmT9cXP68MXB3uwRu.asgw6h4NS';
-    let db = { shortcuts: [], links: [] }, currentMode = 'shortcut', currentFolder = 'all', editId = null, isEditMode = false, selectedColor = '#007aff';
+    const ADMIN_PW = '1234'; // 관리자 비밀번호
+    let db = { shortcuts: [], links: [] }, currentMode = 'shortcut', currentFolder = 'all', editId = null, isEditMode = false, selectedColor = '#007aff', isAdmin = false;
     const presets = ['#5856D6', '#34C759', '#007AFF', '#FF9500', '#FF3B30', '#E27373', '#8E8E93', '#2C2C2E', '#A2845E'];
+
+    // 관리자 인증 처리
+    function adminAction(callback) {
+        if (isAdmin) { callback(); return; }
+        const pw = prompt('관리자 비밀번호를 입력하세요:');
+        if (pw === ADMIN_PW) { isAdmin = true; callback(); } 
+        else if (pw !== null) { alert('비밀번호가 틀렸습니다.'); }
+    }
+
+    // 영역 밖 클릭 시 사이드바 닫기 (모바일용)
+    function closeSidebarOnOutsideClick() {
+        const sidebar = document.getElementById('sidebar');
+        if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+            toggleSidebar();
+        }
+    }
 
     async function loadData() {
         const local = localStorage.getItem('shortcut_link_db');
@@ -172,8 +187,8 @@
         if(currentFolder !== 'all') list = list.filter(x => (x.folder||'기본') === currentFolder);
 
         display.innerHTML = list.filter(x => x.title.toLowerCase().includes(term)).map(item => `
-            <div class="${currentMode}-card" style="background:${item.color}" onclick="openModal('${item.id}')">
-                <div class="del-badge" onclick="deleteItem('${item.id}', event)">✕</div>
+            <div class="${currentMode}-card" style="background:${item.color}" onclick="handleCardClick('${item.id}')">
+                <div class="del-badge" onclick="adminAction(() => deleteItem('${item.id}', event))">✕</div>
                 <div class="card-dots">...</div>
                 ${currentMode==='shortcut' ? `<div class="card-icon">${item.icon||'📱'}</div>` : ''}
                 <div>
@@ -186,17 +201,20 @@
         updateSidebarUI();
     }
 
+    function handleCardClick(id) {
+        if (isEditMode) adminAction(() => openModal(id));
+        else {
+            const item = (currentMode === 'shortcut' ? db.shortcuts : db.links).find(x => String(x.id) === String(id));
+            if (item && item.url) window.open(item.url, '_blank');
+        }
+    }
+
     function updateSidebarUI() {
         document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
         const activeId = `nav-${currentMode}-all`;
         if(currentFolder === 'all' && document.getElementById(activeId)) document.getElementById(activeId).classList.add('active');
-
-        document.getElementById('shortcutFolderList').innerHTML = [...new Set(db.shortcuts.map(x=>x.folder||'기본'))].map(f => `
-            <div class="sidebar-item ${currentMode==='shortcut' && currentFolder===f ? 'active' : ''}" onclick="changeView('shortcut', '${f}')">📂 ${f}</div>
-        `).join('');
-        document.getElementById('linkFolderList').innerHTML = [...new Set(db.links.map(x=>x.folder||'기본'))].map(f => `
-            <div class="sidebar-item ${currentMode==='link' && currentFolder===f ? 'active' : ''}" onclick="changeView('link', '${f}')">📁 ${f}</div>
-        `).join('');
+        document.getElementById('shortcutFolderList').innerHTML = [...new Set(db.shortcuts.map(x=>x.folder||'기본'))].map(f => `<div class="sidebar-item ${currentMode==='shortcut' && currentFolder===f ? 'active' : ''}" onclick="changeView('shortcut', '${f}')">📂 ${f}</div>`).join('');
+        document.getElementById('linkFolderList').innerHTML = [...new Set(db.links.map(x=>x.folder||'기본'))].map(f => `<div class="sidebar-item ${currentMode==='link' && currentFolder===f ? 'active' : ''}" onclick="changeView('link', '${f}')">📁 ${f}</div>`).join('');
     }
 
     function selectColor(c) { selectedColor = c; renderPalette(); }
@@ -209,8 +227,8 @@
     }
 
     function changeView(m, f) { currentMode = m; currentFolder = f; document.getElementById('viewTitle').innerText = f==='all'?(m==='shortcut'?'모든 단축어':'모든 링크'):f; render(); if(window.innerWidth<=768) toggleSidebar(); }
+    
     function openModal(id = null) {
-        if(isEditMode) return;
         document.getElementById('modal').style.display = 'flex';
         const openLink = document.getElementById('modalOpenLink');
         if(id) {
