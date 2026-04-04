@@ -57,7 +57,6 @@
         .color-dot { width: 38px; height: 38px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: transform 0.2s; }
         .color-dot.active { border-color: var(--text-main); transform: scale(1.1); }
         
-        /* 레인보우 피커 수정: PC 클릭 가능하도록 개선 */
         .rainbow-picker { width: 38px; height: 38px; border-radius: 50%; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); position: relative; cursor: pointer; border: 3px solid transparent; box-sizing: border-box; }
         .rainbow-picker.active { border-color: var(--text-main); transform: scale(1.1); }
         .rainbow-picker input[type="color"] { position: absolute; opacity: 0; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer; pointer-events: auto; }
@@ -66,9 +65,13 @@
         .del-badge { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; }
         .edit-mode .del-badge { display: flex; }
 
+        /* ✕ 버튼: 기본 숨김, 모바일 전용 */
+        .sidebar-close-btn { display: none; justify-content: flex-end; padding: 10px; font-size: 24px; cursor: pointer; color: var(--apple-blue); }
+
         @media (max-width: 768px) {
             .sidebar { position: absolute; left: 0; top: 0; height: 100%; transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
+            .sidebar-close-btn { display: flex; } /* 모바일에서만 노출 */
             .menu-toggle { display: block; }
         }
     </style>
@@ -76,7 +79,8 @@
 <body>
 
 <div class="sidebar" id="sidebar">
-    <div style="display:flex; justify-content:flex-end; padding:10px;" class="menu-toggle" onclick="toggleSidebar()">✕</div>
+    <div class="sidebar-close-btn" onclick="toggleSidebar()">✕</div>
+    
     <div class="sidebar-section">
         <div class="sidebar-header" onclick="toggleSection('shortcutSection', this)">단축어 <span class="arrow">▼</span></div>
         <div id="shortcutSection" class="sidebar-content">
@@ -130,8 +134,7 @@
         <input type="text" id="in-desc" placeholder="짧은 설명">
         <input type="text" id="in-folder" placeholder="폴더명">
         <textarea id="in-usage" placeholder="메모" style="height:80px;"></textarea>
-        <div class="color-row" id="palette">
-            </div>
+        <div class="color-row" id="palette"></div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px;">
             <button class="m-btn" style="background:#eee;" onclick="closeModal()">취소</button>
             <button class="m-btn" style="background:var(--apple-blue); color:white;" onclick="saveEntry()">저장</button>
@@ -197,27 +200,15 @@
     }
 
     function selectColor(c) { selectedColor = c; renderPalette(); }
-    
     function renderPalette() {
         const p = document.getElementById('palette');
         const isPreset = presets.some(pc => pc.toLowerCase() === selectedColor.toLowerCase());
-        
-        const presetHtml = presets.map(c => `
-            <div class="color-dot ${selectedColor.toLowerCase()===c.toLowerCase()?'active':''}" 
-                 style="background:${c}" onclick="selectColor('${c}')"></div>
-        `).join('');
-        
-        // 무지개 피커 수정: 커스텀 컬러인 경우 내부 색상 변경 및 active 효과
-        const rainbowHtml = `
-            <div class="rainbow-picker ${!isPreset?'active':''}" id="rb-preview" style="background:${!isPreset ? selectedColor : 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'}">
-                <input type="color" oninput="selectColor(this.value)" value="${selectedColor}">
-            </div>`;
-            
+        const presetHtml = presets.map(c => `<div class="color-dot ${selectedColor.toLowerCase()===c.toLowerCase()?'active':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`).join('');
+        const rainbowHtml = `<div class="rainbow-picker ${!isPreset?'active':''}" style="background:${!isPreset ? selectedColor : 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'}"><input type="color" oninput="selectColor(this.value)" value="${selectedColor}"></div>`;
         p.innerHTML = presetHtml + rainbowHtml;
     }
 
     function changeView(m, f) { currentMode = m; currentFolder = f; document.getElementById('viewTitle').innerText = f==='all'?(m==='shortcut'?'모든 단축어':'모든 링크'):f; render(); if(window.innerWidth<=768) toggleSidebar(); }
-    
     function openModal(id = null) {
         if(isEditMode) return;
         document.getElementById('modal').style.display = 'flex';
@@ -225,27 +216,20 @@
         if(id) {
             const item = (currentMode === 'shortcut' ? db.shortcuts : db.links).find(x => String(x.id) === String(id));
             editId = id;
-            document.getElementById('in-title').value = item.title; 
-            document.getElementById('in-icon').value = item.icon || '';
-            document.getElementById('in-url').value = item.url; 
-            document.getElementById('in-desc').value = item.desc || '';
-            document.getElementById('in-folder').value = item.folder || '기본'; 
-            document.getElementById('in-usage').value = item.usage || '';
-            selectColor(item.color); 
-            openLink.style.display = 'block'; openLink.href = item.url;
+            document.getElementById('in-title').value = item.title; document.getElementById('in-icon').value = item.icon || '';
+            document.getElementById('in-url').value = item.url; document.getElementById('in-desc').value = item.desc || '';
+            document.getElementById('in-folder').value = item.folder || '기본'; document.getElementById('in-usage').value = item.usage || '';
+            selectColor(item.color); openLink.style.display = 'block'; openLink.href = item.url;
         } else {
-            editId = null; 
-            document.querySelectorAll('#modal input, #modal textarea').forEach(i => i.value = '');
-            selectColor(presets[2]); 
-            openLink.style.display = 'none';
+            editId = null; document.querySelectorAll('#modal input, #modal textarea').forEach(i => i.value = '');
+            selectColor(presets[2]); openLink.style.display = 'none';
         }
     }
 
     async function saveEntry() {
         const entry = { id: editId || Date.now(), title: document.getElementById('in-title').value || '제목없음', icon: document.getElementById('in-icon').value, url: document.getElementById('in-url').value, desc: document.getElementById('in-desc').value, folder: document.getElementById('in-folder').value || '기본', usage: document.getElementById('in-usage').value, color: selectedColor };
         const target = currentMode === 'shortcut' ? db.shortcuts : db.links;
-        if(editId) target[target.findIndex(x => String(x.id) === String(editId))] = entry; 
-        else target.push(entry);
+        if(editId) target[target.findIndex(x => String(x.id) === String(editId))] = entry; else target.push(entry);
         render(); closeModal(); await saveData();
     }
 
