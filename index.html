@@ -29,6 +29,7 @@
         .sidebar-item.active { background: rgba(0,0,0,0.1) !important; font-weight: bold; }
         
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+        .footer-tools { display: grid; grid-template-columns: 1fr 50px; gap: 10px; }
         .io-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .io-btn { padding: 12px; border-radius: 14px; border: none; background: white; color: #1c1c1e; font-weight: 600; cursor: pointer; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; }
 
@@ -65,12 +66,10 @@
         .del-badge { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; }
         .edit-mode .del-badge { display: flex; }
 
-        .sidebar-close-btn { display: none; justify-content: flex-end; padding: 10px; font-size: 24px; cursor: pointer; color: var(--apple-blue); }
-
         @media (max-width: 768px) {
             .sidebar { position: absolute; left: 0; top: 0; height: 100%; transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
-            .sidebar-close-btn { display: flex; }
+            .sidebar-close-btn { display: flex; justify-content: flex-end; padding: 10px; font-size: 24px; cursor: pointer; color: var(--apple-blue); }
             .menu-toggle { display: block; }
         }
     </style>
@@ -94,7 +93,10 @@
         </div>
     </div>
     <div class="sidebar-footer">
-        <button onclick="toggleTheme()" style="padding:14px; border-radius:18px; background:var(--apple-blue); color:white; border:none; font-weight:bold; cursor:pointer;">🌓 테마 전환</button>
+        <div class="footer-tools">
+            <button onclick="toggleTheme()" style="padding:14px; border-radius:18px; background:var(--apple-blue); color:white; border:none; font-weight:bold; cursor:pointer;">🌓 테마 전환</button>
+            <button id="loginBtn" onclick="toggleLogin()" style="padding:14px; border-radius:18px; background:#fff; border:none; cursor:pointer; font-size:1.2rem; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.1);">👤</button>
+        </div>
         <div class="io-container">
             <div class="io-btn" onclick="adminAction(() => exportData())">📤 내보내기</div>
             <div class="io-btn" onclick="adminAction(() => document.getElementById('fileIn').click())">📥 불러오기</div>
@@ -123,8 +125,8 @@
 <div id="modal" onclick="closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <h2 style="margin:0">정보 편집</h2>
-            <a href="#" id="modalOpenLink" target="_blank" style="color:var(--apple-blue); font-weight:bold; text-decoration:none;">열기</a>
+            <h2 style="margin:0">정보 확인</h2>
+            <a href="#" id="modalOpenLink" target="_blank" style="color:var(--apple-blue); font-weight:bold; text-decoration:none; font-size:1.1rem;">열기</a>
         </div>
         <input type="text" id="in-title" placeholder="제목">
         <input type="text" id="in-icon" placeholder="아이콘">
@@ -133,33 +135,40 @@
         <input type="text" id="in-folder" placeholder="폴더명">
         <textarea id="in-usage" placeholder="메모" style="height:80px;"></textarea>
         <div class="color-row" id="palette"></div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px;">
-            <button class="m-btn" style="background:#eee;" onclick="closeModal()">취소</button>
-            <button class="m-btn" style="background:var(--apple-blue); color:white;" onclick="saveEntry()">저장</button>
+        <div id="modalButtons" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px;">
+            <button class="m-btn" style="background:#eee;" onclick="closeModal()">닫기</button>
+            <button id="saveBtn" class="m-btn" style="background:var(--apple-blue); color:white; display:none;" onclick="saveEntry()">저장</button>
         </div>
     </div>
 </div>
 
 <script>
     const BIN_ID = '69ce0ae7aaba882197b8e875', API_KEY = '$2a$10$/FXh/Agpz01vjrcmEic7wugXaICmT9cXP68MXB3uwRu.asgw6h4NS';
-    const ADMIN_PW = '1234'; // 관리자 비밀번호
+    const ADMIN_PW = '1234'; 
     let db = { shortcuts: [], links: [] }, currentMode = 'shortcut', currentFolder = 'all', editId = null, isEditMode = false, selectedColor = '#007aff', isAdmin = false;
     const presets = ['#5856D6', '#34C759', '#007AFF', '#FF9500', '#FF3B30', '#E27373', '#8E8E93', '#2C2C2E', '#A2845E'];
 
-    // 관리자 인증 처리
-    function adminAction(callback) {
-        if (isAdmin) { callback(); return; }
-        const pw = prompt('관리자 비밀번호를 입력하세요:');
-        if (pw === ADMIN_PW) { isAdmin = true; callback(); } 
-        else if (pw !== null) { alert('비밀번호가 틀렸습니다.'); }
+    function toggleLogin() {
+        if (isAdmin) { if(confirm('로그아웃 하시겠습니까?')) { isAdmin = false; updateLoginUI(); } }
+        else { const pw = prompt('관리자 비밀번호를 입력하세요:'); if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); } else if (pw !== null) alert('틀렸습니다.'); }
     }
 
-    // 영역 밖 클릭 시 사이드바 닫기 (모바일용)
+    function updateLoginUI() {
+        document.getElementById('loginBtn').innerText = isAdmin ? '🔓' : '👤';
+        document.getElementById('loginBtn').style.background = isAdmin ? '#e1f5fe' : '#fff';
+        render();
+    }
+
+    function adminAction(callback) {
+        if (isAdmin) { callback(); return; }
+        const pw = prompt('관리자 권한이 필요합니다. 비밀번호:');
+        if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); callback(); } 
+        else if (pw !== null) alert('비밀번호가 틀렸습니다.');
+    }
+
     function closeSidebarOnOutsideClick() {
         const sidebar = document.getElementById('sidebar');
-        if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
-            toggleSidebar();
-        }
+        if (window.innerWidth <= 768 && sidebar.classList.contains('open')) toggleSidebar();
     }
 
     async function loadData() {
@@ -174,9 +183,7 @@
 
     async function saveData() {
         localStorage.setItem('shortcut_link_db', JSON.stringify(db));
-        try {
-            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify(db) });
-        } catch(e) {}
+        try { await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify(db) }); } catch(e) {}
     }
 
     function render() {
@@ -187,7 +194,7 @@
         if(currentFolder !== 'all') list = list.filter(x => (x.folder||'기본') === currentFolder);
 
         display.innerHTML = list.filter(x => x.title.toLowerCase().includes(term)).map(item => `
-            <div class="${currentMode}-card" style="background:${item.color}" onclick="handleCardClick('${item.id}')">
+            <div class="${currentMode}-card" style="background:${item.color}" onclick="openModal('${item.id}')">
                 <div class="del-badge" onclick="adminAction(() => deleteItem('${item.id}', event))">✕</div>
                 <div class="card-dots">...</div>
                 ${currentMode==='shortcut' ? `<div class="card-icon">${item.icon||'📱'}</div>` : ''}
@@ -199,14 +206,6 @@
             </div>
         `).join('');
         updateSidebarUI();
-    }
-
-    function handleCardClick(id) {
-        if (isEditMode) adminAction(() => openModal(id));
-        else {
-            const item = (currentMode === 'shortcut' ? db.shortcuts : db.links).find(x => String(x.id) === String(id));
-            if (item && item.url) window.open(item.url, '_blank');
-        }
     }
 
     function updateSidebarUI() {
@@ -231,6 +230,12 @@
     function openModal(id = null) {
         document.getElementById('modal').style.display = 'flex';
         const openLink = document.getElementById('modalOpenLink');
+        const saveBtn = document.getElementById('saveBtn');
+        const inputs = document.querySelectorAll('#modal input, #modal textarea');
+        
+        saveBtn.style.display = isAdmin ? 'block' : 'none';
+        inputs.forEach(i => i.readOnly = !isAdmin);
+
         if(id) {
             const item = (currentMode === 'shortcut' ? db.shortcuts : db.links).find(x => String(x.id) === String(id));
             editId = id;
@@ -239,7 +244,7 @@
             document.getElementById('in-folder').value = item.folder || '기본'; document.getElementById('in-usage').value = item.usage || '';
             selectColor(item.color); openLink.style.display = 'block'; openLink.href = item.url;
         } else {
-            editId = null; document.querySelectorAll('#modal input, #modal textarea').forEach(i => i.value = '');
+            editId = null; inputs.forEach(i => i.value = '');
             selectColor(presets[2]); openLink.style.display = 'none';
         }
     }
