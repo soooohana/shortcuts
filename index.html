@@ -45,20 +45,18 @@
         .grid-container { flex: 1; overflow-y: auto; padding: 25px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; align-content: start; }
         .shortcut-card { position: relative; aspect-ratio: 1 / 1; border-radius: 35px; padding: 25px; color: white; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 8px 18px var(--card-shadow); cursor: pointer; }
         .card-icon { font-size: 2.2rem; }
-        .card-dots { position: absolute; top: 22px; right: 22px; width: 32px; height: 32px; background: rgba(255,255,255,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 
         /* */
+        .card-dots { position: absolute; top: 22px; right: 22px; width: 32px; height: 32px; background: rgba(255,255,255,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+        .del-badge { position: absolute; top: 22px; right: 22px; width: 32px; height: 32px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; cursor: pointer; }
+        .edit-mode .del-badge { display: flex; }
+        .edit-mode .card-dots { display: none; } /* 편집 모드일 때만 말줄임표 숨기고 삭제버튼 노출 */
+
         .link-list-container { flex: 1; overflow-y: auto; padding: 20px 30px; display: flex; flex-direction: column; gap: 15px; }
         .link-card { position: relative; border-radius: 30px; padding: 22px 28px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 15px var(--card-shadow); cursor: pointer; overflow: hidden; }
-        .link-info { flex: 1; min-width: 0; padding-right: 40px; } /* 텍스트 영역이 카드를 넘지 않게 고정 */
-        .link-url-text { 
-            font-size: 0.85rem; opacity: 0.75; text-decoration: underline; margin-top: 2px; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; /* 주소가 길면 ...로 표시 */
-        }
-        .link-title-text { 
-            font-weight: bold; font-size: 1.15rem; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; 
-        }
+        .link-info { flex: 1; min-width: 0; padding-right: 40px; }
+        .link-url-text { font-size: 0.85rem; opacity: 0.75; text-decoration: underline; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .link-title-text { font-weight: bold; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
         /* 모달 */
         #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
@@ -80,9 +78,6 @@
         .modal-btns-grid.edit-state { grid-template-columns: 1fr 1fr; }
         .modal-btns-grid.view-state { grid-template-columns: 1fr; }
 
-        .del-badge { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; }
-        .edit-mode .del-badge { display: flex; }
-
         @media (max-width: 768px) {
             .sidebar { position: absolute; left: 0; top: 0; height: 100%; transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
@@ -90,9 +85,7 @@
         }
     </style>
 </head>
-<body>
-
-<div class="sidebar" id="sidebar">
+<body data-theme="light"> <div class="sidebar" id="sidebar">
     <div class="sidebar-section">
         <div class="sidebar-header" onclick="toggleSection('shortcutSection', this)">단축어 <span class="arrow">▼</span></div>
         <div id="shortcutSection" class="sidebar-content">
@@ -165,6 +158,19 @@
     let db = { shortcuts: [], links: [] }, currentMode = 'shortcut', currentFolder = 'all', editId = null, isEditMode = false, selectedColor = '#007aff', isAdmin = false;
     const presets = ['#5856D6', '#34C759', '#007AFF', '#FF9500', '#FF3B30', '#E27373', '#8E8E93', '#2C2C2E', '#A2845E'];
 
+    /* */
+    function initTheme() {
+        const savedTheme = localStorage.getItem('user_theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+    }
+
+    function toggleTheme() {
+        const current = document.body.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.body.setAttribute('data-theme', next);
+        localStorage.setItem('user_theme', next); // 로컬 스토리지에 테마 저장
+    }
+
     function toggleLogin() {
         if (isAdmin) { if(confirm('로그아웃 하시겠습니까?')) { isAdmin = false; updateLoginUI(); } }
         else { const pw = prompt('관리자 비밀번호를 입력하세요:'); if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); } else if (pw !== null) alert('틀렸습니다.'); }
@@ -182,6 +188,7 @@
     function closeSidebarOnOutsideClick() { const sidebar = document.getElementById('sidebar'); if (window.innerWidth <= 768 && sidebar.classList.contains('open')) toggleSidebar(); }
 
     async function loadData() {
+        initTheme(); // 페이지 로드 시 테마 설정 호출
         const local = localStorage.getItem('shortcut_link_db');
         if(local) { db = JSON.parse(local); render(); }
         try {
@@ -196,7 +203,6 @@
         try { await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify(db) }); } catch(e) {}
     }
 
-    /* */
     function render() {
         const display = document.getElementById('mainDisplay');
         const term = document.getElementById('searchInput').value.toLowerCase();
@@ -206,8 +212,8 @@
 
         display.innerHTML = list.filter(x => x.title.toLowerCase().includes(term)).map(item => `
             <div class="${currentMode}-card" style="background:${item.color}" onclick="openModal('${item.id}')">
-                <div class="del-badge" onclick="adminAction(() => deleteItem('${item.id}', event))">✕</div>
                 <div class="card-dots">...</div>
+                <div class="del-badge" onclick="adminAction(() => deleteItem('${item.id}', event))">✕</div>
                 ${currentMode==='shortcut' ? `<div class="card-icon">${item.icon||'📱'}</div>` : ''}
                 <div class="link-info">
                     <div class="link-title-text">${currentMode==='link'?(item.icon||'🔗'):''} ${item.title}</div>
@@ -282,7 +288,6 @@
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
     function toggleSection(id, header) { document.getElementById(id).classList.toggle('hidden'); header.classList.toggle('closed'); }
     function toggleEditMode() { isEditMode = !isEditMode; document.body.classList.toggle('edit-mode'); document.getElementById('editBtn').innerText = isEditMode?'완료':'편집'; }
-    function toggleTheme() { document.body.setAttribute('data-theme', document.body.getAttribute('data-theme')==='light'?'dark':'light'); }
     function exportData() { const blob = new Blob([JSON.stringify(db)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='backup.json'; a.click(); }
     function importData(e) { const reader = new FileReader(); reader.onload = async (ev) => { db = JSON.parse(ev.target.result); await saveData(); render(); }; reader.readAsText(e.target.files[0]); }
     loadData();
