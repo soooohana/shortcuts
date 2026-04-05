@@ -47,8 +47,18 @@
         .card-icon { font-size: 2.2rem; }
         .card-dots { position: absolute; top: 22px; right: 22px; width: 32px; height: 32px; background: rgba(255,255,255,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 
+        /* */
         .link-list-container { flex: 1; overflow-y: auto; padding: 20px 30px; display: flex; flex-direction: column; gap: 15px; }
-        .link-card { position: relative; border-radius: 30px; padding: 22px 28px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 15px var(--card-shadow); cursor: pointer; }
+        .link-card { position: relative; border-radius: 30px; padding: 22px 28px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 15px var(--card-shadow); cursor: pointer; overflow: hidden; }
+        .link-info { flex: 1; min-width: 0; padding-right: 40px; } /* 텍스트 영역이 카드를 넘지 않게 고정 */
+        .link-url-text { 
+            font-size: 0.85rem; opacity: 0.75; text-decoration: underline; margin-top: 2px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; /* 주소가 길면 ...로 표시 */
+        }
+        .link-title-text { 
+            font-weight: bold; font-size: 1.15rem; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; 
+        }
 
         /* 모달 */
         #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
@@ -66,10 +76,9 @@
         .m-btn { padding: 18px; border-radius: 22px; border: none; font-weight: bold; cursor: pointer; font-size: 1.1rem; transition: opacity 0.2s; }
         .m-btn:active { opacity: 0.7; }
         
-        /* 버튼 레이아웃 제어 */
         .modal-btns-grid { display: grid; gap: 15px; margin-top: 10px; width: 100%; }
-        .modal-btns-grid.edit-state { grid-template-columns: 1fr 1fr; } /* 로그인: 취소/저장 */
-        .modal-btns-grid.view-state { grid-template-columns: 1fr; }     /* 로그아웃: 닫기 단일 */
+        .modal-btns-grid.edit-state { grid-template-columns: 1fr 1fr; }
+        .modal-btns-grid.view-state { grid-template-columns: 1fr; }
 
         .del-badge { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2.5px solid white; z-index: 10; }
         .edit-mode .del-badge { display: flex; }
@@ -102,7 +111,7 @@
         <div class="footer-tools">
             <button onclick="toggleTheme()" style="padding:14px; border-radius:18px; background:var(--apple-blue); color:white; border:none; font-weight:bold; cursor:pointer;">🌓 테마 전환</button>
             <button id="loginBtn" onclick="toggleLogin()" class="icon-btn" style="background:#fff; color:#1c1c1e;">
-                <svg id="loginIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </button>
         </div>
         <div class="io-container">
@@ -152,41 +161,25 @@
 
 <script>
     const BIN_ID = '69ce0ae7aaba882197b8e875', API_KEY = '$2a$10$/FXh/Agpz01vjrcmEic7wugXaICmT9cXP68MXB3uwRu.asgw6h4NS';
-    const ADMIN_PW = 'xuxusoso35'; 
+    const ADMIN_PW = '1234'; 
     let db = { shortcuts: [], links: [] }, currentMode = 'shortcut', currentFolder = 'all', editId = null, isEditMode = false, selectedColor = '#007aff', isAdmin = false;
     const presets = ['#5856D6', '#34C759', '#007AFF', '#FF9500', '#FF3B30', '#E27373', '#8E8E93', '#2C2C2E', '#A2845E'];
 
-    const userIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-    const lockIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-
     function toggleLogin() {
-        if (isAdmin) { 
-            if(confirm('로그아웃 하시겠습니까?')) { isAdmin = false; updateLoginUI(); } 
-        } else { 
-            const pw = prompt('관리자 비밀번호를 입력하세요:'); 
-            if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); } 
-            else if (pw !== null) alert('틀렸습니다.'); 
-        }
+        if (isAdmin) { if(confirm('로그아웃 하시겠습니까?')) { isAdmin = false; updateLoginUI(); } }
+        else { const pw = prompt('관리자 비밀번호를 입력하세요:'); if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); } else if (pw !== null) alert('틀렸습니다.'); }
     }
 
     function updateLoginUI() {
         const loginBtn = document.getElementById('loginBtn');
-        loginBtn.innerHTML = isAdmin ? lockIcon : userIcon;
+        loginBtn.innerHTML = isAdmin ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>` : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         loginBtn.style.background = isAdmin ? '#e1f5fe' : '#fff';
         render();
     }
 
-    function adminAction(callback) {
-        if (isAdmin) { callback(); return; }
-        const pw = prompt('관리자 권한이 필요합니다. 비밀번호:');
-        if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); callback(); } 
-        else if (pw !== null) alert('비밀번호가 틀렸습니다.');
-    }
+    function adminAction(callback) { if (isAdmin) { callback(); return; } const pw = prompt('관리자 권한이 필요합니다. 비밀번호:'); if (pw === ADMIN_PW) { isAdmin = true; updateLoginUI(); callback(); } else if (pw !== null) alert('비밀번호가 틀렸습니다.'); }
 
-    function closeSidebarOnOutsideClick() {
-        const sidebar = document.getElementById('sidebar');
-        if (window.innerWidth <= 768 && sidebar.classList.contains('open')) toggleSidebar();
-    }
+    function closeSidebarOnOutsideClick() { const sidebar = document.getElementById('sidebar'); if (window.innerWidth <= 768 && sidebar.classList.contains('open')) toggleSidebar(); }
 
     async function loadData() {
         const local = localStorage.getItem('shortcut_link_db');
@@ -203,6 +196,7 @@
         try { await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify(db) }); } catch(e) {}
     }
 
+    /* */
     function render() {
         const display = document.getElementById('mainDisplay');
         const term = document.getElementById('searchInput').value.toLowerCase();
@@ -215,8 +209,8 @@
                 <div class="del-badge" onclick="adminAction(() => deleteItem('${item.id}', event))">✕</div>
                 <div class="card-dots">...</div>
                 ${currentMode==='shortcut' ? `<div class="card-icon">${item.icon||'📱'}</div>` : ''}
-                <div>
-                    <div style="font-weight:bold; font-size:1.15rem;">${currentMode==='link'?(item.icon||'🔗'):''} ${item.title}</div>
+                <div class="link-info">
+                    <div class="link-title-text">${currentMode==='link'?(item.icon||'🔗'):''} ${item.title}</div>
                     ${currentMode==='link' ? `<div class="link-url-text">${item.url}</div>` : ''}
                     <div style="font-size:0.85rem; opacity:0.85; margin-top:4px;">${item.desc||''}</div>
                 </div>
@@ -252,19 +246,13 @@
         const btnsGrid = document.getElementById('modalButtons');
         const inputs = document.querySelectorAll('#modal input, #modal textarea');
         
-        // 로그인 여부에 따른 UI 세팅
         if (isAdmin) {
-            modalTitle.innerText = "정보 편집";
-            cancelBtn.innerText = "취소";
-            saveBtn.style.display = 'block';
-            btnsGrid.className = 'modal-btns-grid edit-state';
+            modalTitle.innerText = "정보 편집"; cancelBtn.innerText = "취소";
+            saveBtn.style.display = 'block'; btnsGrid.className = 'modal-btns-grid edit-state';
         } else {
-            modalTitle.innerText = "정보 확인";
-            cancelBtn.innerText = "닫기";
-            saveBtn.style.display = 'none';
-            btnsGrid.className = 'modal-btns-grid view-state';
+            modalTitle.innerText = "정보 확인"; cancelBtn.innerText = "닫기";
+            saveBtn.style.display = 'none'; btnsGrid.className = 'modal-btns-grid view-state';
         }
-
         inputs.forEach(i => i.readOnly = !isAdmin);
 
         if(id) {
@@ -274,12 +262,10 @@
             document.getElementById('in-url').value = item.url; document.getElementById('in-desc').value = item.desc || '';
             document.getElementById('in-folder').value = item.folder || '기본'; document.getElementById('in-usage').value = item.usage || '';
             selectColor(item.color); 
-            document.getElementById('modalOpenLink').style.display = 'block';
-            document.getElementById('modalOpenLink').href = item.url;
+            document.getElementById('modalOpenLink').style.display = 'block'; document.getElementById('modalOpenLink').href = item.url;
         } else {
             editId = null; inputs.forEach(i => i.value = '');
-            selectColor(presets[2]); 
-            document.getElementById('modalOpenLink').style.display = 'none';
+            selectColor(presets[2]); document.getElementById('modalOpenLink').style.display = 'none';
         }
         renderPalette();
     }
